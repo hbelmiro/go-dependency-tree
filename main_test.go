@@ -40,7 +40,7 @@ func TestPrintTree_DiamondDependency(t *testing.T) {
 	require.NotContains(t, output, "(cycle)")
 
 	cCount := 0
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		if strings.Contains(line, "C") && !strings.Contains(line, "(cycle)") {
 			cCount++
 		}
@@ -105,7 +105,7 @@ func TestPrintTree_DiamondWithSubtree(t *testing.T) {
 	require.NotContains(t, output, "(cycle)")
 
 	dCount := 0
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		if strings.Contains(line, "D") {
 			dCount++
 		}
@@ -126,7 +126,7 @@ func TestPrintTree_DiamondWithCycle(t *testing.T) {
 	})
 
 	cCount := 0
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		if strings.Contains(line, "C") && !strings.Contains(line, "(cycle)") {
 			cCount++
 		}

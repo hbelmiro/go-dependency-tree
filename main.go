@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"maps"
 	"os/exec"
 	"strings"
 )
@@ -66,9 +67,7 @@ func printTree(nodes map[string][]string, root string, indent string, isLast boo
 	for i, child := range children {
 		isLastChild := i == len(children)-1
 		childVisited := make(map[string]bool, len(visited))
-		for k, v := range visited {
-			childVisited[k] = v
-		}
+		maps.Copy(childVisited, visited)
 		printTree(nodes, child, indent, isLastChild, childVisited)
 	}
 }
