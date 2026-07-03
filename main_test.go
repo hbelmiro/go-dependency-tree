@@ -338,36 +338,139 @@ func TestFindPaths_DistinctNodesMatchingSameSubstring(t *testing.T) {
 	assert.Equal(t, [][]string{{"root", "alpha-x"}, {"root", "beta-x"}}, paths)
 }
 
-func TestPrintPath_LinearPath(t *testing.T) {
-	path := []string{"root", "A", "B", "C"}
+func TestBuildMergedTree_SinglePath(t *testing.T) {
+	paths := [][]string{{"root", "A", "B", "C"}}
 
-	output := captureOutput(func() {
-		printPath(path)
-	})
+	merged := buildMergedTree(paths)
 
-	expected := "root\n    └── A\n        └── B\n            └── C\n"
-	assert.Equal(t, expected, output)
+	assert.Equal(t, []string{"A"}, merged["root"])
+	assert.Equal(t, []string{"B"}, merged["A"])
+	assert.Equal(t, []string{"C"}, merged["B"])
 }
 
-func TestPrintPath_SingleNode(t *testing.T) {
-	path := []string{"root"}
+func TestBuildMergedTree_DiamondPaths(t *testing.T) {
+	paths := [][]string{
+		{"root", "A", "C"},
+		{"root", "B", "C"},
+	}
 
-	output := captureOutput(func() {
-		printPath(path)
-	})
+	merged := buildMergedTree(paths)
 
-	assert.Equal(t, "root\n", output)
+	assert.Equal(t, []string{"A", "B"}, merged["root"])
+	assert.Equal(t, []string{"C"}, merged["A"])
+	assert.Equal(t, []string{"C"}, merged["B"])
 }
 
-func TestPrintPath_TwoNodes(t *testing.T) {
-	path := []string{"root", "A"}
+func TestBuildMergedTree_SharedPrefix(t *testing.T) {
+	paths := [][]string{
+		{"root", "A", "B"},
+		{"root", "A", "C"},
+	}
 
+	merged := buildMergedTree(paths)
+
+	assert.Equal(t, []string{"A"}, merged["root"])
+	assert.Equal(t, []string{"B", "C"}, merged["A"])
+}
+
+func TestBuildMergedTree_SingleNodePath(t *testing.T) {
+	paths := [][]string{{"root"}}
+
+	merged := buildMergedTree(paths)
+
+	assert.Empty(t, merged)
+}
+
+func TestBuildMergedTree_ChildOrder(t *testing.T) {
+	paths := [][]string{
+		{"root", "X", "Z"},
+		{"root", "Y", "Z"},
+		{"root", "X", "W"},
+	}
+
+	merged := buildMergedTree(paths)
+
+	assert.Equal(t, []string{"X", "Y"}, merged["root"], "children should appear in first-seen order")
+	assert.Equal(t, []string{"Z", "W"}, merged["X"], "children should appear in first-seen order")
+}
+
+func TestMergedOutput_DiamondPaths(t *testing.T) {
+	paths := [][]string{
+		{"root", "A", "C"},
+		{"root", "B", "C"},
+	}
+
+	merged := buildMergedTree(paths)
 	output := captureOutput(func() {
-		printPath(path)
+		printTree(merged, paths[0][0], "", true, make(map[string]bool))
 	})
 
-	expected := "root\n    └── A\n"
-	assert.Equal(t, expected, output)
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	require.Len(t, lines, 5)
+	assert.Equal(t, "root", lines[0])
+	assert.Equal(t, "    ├── A", lines[1])
+	assert.Equal(t, "    │   └── C", lines[2])
+	assert.Equal(t, "    └── B", lines[3])
+	assert.Equal(t, "        └── C", lines[4])
+}
+
+func TestMergedOutput_SinglePath(t *testing.T) {
+	paths := [][]string{
+		{"root", "A", "B", "C"},
+	}
+
+	merged := buildMergedTree(paths)
+	output := captureOutput(func() {
+		printTree(merged, paths[0][0], "", true, make(map[string]bool))
+	})
+
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	require.Len(t, lines, 4)
+	assert.Equal(t, "root", lines[0])
+	assert.Equal(t, "    └── A", lines[1])
+	assert.Equal(t, "        └── B", lines[2])
+	assert.Equal(t, "            └── C", lines[3])
+}
+
+func TestMergedOutput_SharedPrefix(t *testing.T) {
+	paths := [][]string{
+		{"root", "A", "B"},
+		{"root", "A", "C"},
+	}
+
+	merged := buildMergedTree(paths)
+	output := captureOutput(func() {
+		printTree(merged, paths[0][0], "", true, make(map[string]bool))
+	})
+
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	require.Len(t, lines, 4)
+	assert.Equal(t, "root", lines[0])
+	assert.Equal(t, "    └── A", lines[1])
+	assert.Equal(t, "        ├── B", lines[2])
+	assert.Equal(t, "        └── C", lines[3])
+}
+
+func TestMergedOutput_DiamondWithSubtree(t *testing.T) {
+	paths := [][]string{
+		{"root", "A", "C", "D"},
+		{"root", "B", "C", "D"},
+	}
+
+	merged := buildMergedTree(paths)
+	output := captureOutput(func() {
+		printTree(merged, paths[0][0], "", true, make(map[string]bool))
+	})
+
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	require.Len(t, lines, 7)
+	assert.Equal(t, "root", lines[0])
+	assert.Equal(t, "    ├── A", lines[1])
+	assert.Equal(t, "    │   └── C", lines[2])
+	assert.Equal(t, "    │       └── D", lines[3])
+	assert.Equal(t, "    └── B", lines[4])
+	assert.Equal(t, "        └── C", lines[5])
+	assert.Equal(t, "            └── D", lines[6])
 }
 
 func TestReadNodes(t *testing.T) {

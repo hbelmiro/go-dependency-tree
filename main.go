@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	up := flag.Bool("up", false, "show path(s) from root to the matched module")
+	up := flag.Bool("up", false, "show dependency tree from root to the matched module")
 	down := flag.Bool("down", false, "show the matched module's subtree")
 	flag.Parse()
 
@@ -42,13 +42,9 @@ func main() {
 	printed := false
 
 	if *up {
-		for _, path := range paths {
-			if printed {
-				fmt.Println()
-			}
-			printed = true
-			printPath(path)
-		}
+		merged := buildMergedTree(paths)
+		printTree(merged, paths[0][0], "", true, make(map[string]bool))
+		printed = true
 	}
 
 	if *down {
@@ -151,16 +147,22 @@ func findPaths(nodes map[string][]string, root, target string) [][]string {
 	return results
 }
 
-func printPath(path []string) {
-	if len(path) == 0 {
-		return
+func buildMergedTree(paths [][]string) map[string][]string {
+	merged := make(map[string][]string)
+	childSet := make(map[string]map[string]bool)
+	for _, path := range paths {
+		for i := 0; i < len(path)-1; i++ {
+			parent, child := path[i], path[i+1]
+			if childSet[parent] == nil {
+				childSet[parent] = make(map[string]bool)
+			}
+			if !childSet[parent][child] {
+				childSet[parent][child] = true
+				merged[parent] = append(merged[parent], child)
+			}
+		}
 	}
-	fmt.Println(path[0])
-	indent := "    "
-	for i := 1; i < len(path); i++ {
-		fmt.Println(indent + "└── " + path[i])
-		indent += "    "
-	}
+	return merged
 }
 
 func getModuleName() string {
