@@ -80,6 +80,24 @@ func TestPrintTree_RealCycle(t *testing.T) {
 	assert.Contains(t, output, "A (cycle)")
 }
 
+func TestPrintTree_CycleOnNonLastChild(t *testing.T) {
+	nodes := map[string][]string{
+		"root": {"A"},
+		"A":    {"root", "B"},
+	}
+
+	output := captureOutput(func() {
+		printTree(nodes, "root", "", true, make(map[string]bool))
+	})
+
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	require.Len(t, lines, 4)
+	assert.Equal(t, "root", lines[0])
+	assert.Equal(t, "    └── A", lines[1])
+	assert.Equal(t, "        ├── root (cycle)", lines[2])
+	assert.Equal(t, "        └── B", lines[3])
+}
+
 func TestPrintTree_SingleNode(t *testing.T) {
 	nodes := map[string][]string{}
 
@@ -134,6 +152,222 @@ func TestPrintTree_DiamondWithCycle(t *testing.T) {
 	assert.Equal(t, 2, cCount, "C should appear under both A and B")
 	assert.Contains(t, output, "A (cycle)", "first branch should detect A→C→A cycle")
 	assert.Contains(t, output, "C (cycle)", "second branch should detect B→C→A→C cycle")
+}
+
+func TestPrintTree_BranchingCharacters(t *testing.T) {
+	nodes := map[string][]string{
+		"root": {"A", "B", "C"},
+	}
+
+	output := captureOutput(func() {
+		printTree(nodes, "root", "", true, make(map[string]bool))
+	})
+
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	require.Len(t, lines, 4)
+	assert.Equal(t, "root", lines[0])
+	assert.Equal(t, "    ├── A", lines[1])
+	assert.Equal(t, "    ├── B", lines[2])
+	assert.Equal(t, "    └── C", lines[3])
+}
+
+func TestPrintTree_IndentContinuation(t *testing.T) {
+	nodes := map[string][]string{
+		"root": {"A", "B"},
+		"A":    {"C"},
+		"B":    {"D"},
+	}
+
+	output := captureOutput(func() {
+		printTree(nodes, "root", "", true, make(map[string]bool))
+	})
+
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	require.Len(t, lines, 5)
+	assert.Equal(t, "root", lines[0])
+	assert.Equal(t, "    ├── A", lines[1])
+	assert.Equal(t, "    │   └── C", lines[2])
+	assert.Equal(t, "    └── B", lines[3])
+	assert.Equal(t, "        └── D", lines[4])
+}
+
+func TestPrintTree_DeepIndentPropagation(t *testing.T) {
+	nodes := map[string][]string{
+		"root": {"A", "B"},
+		"A":    {"C"},
+		"C":    {"D"},
+	}
+
+	output := captureOutput(func() {
+		printTree(nodes, "root", "", true, make(map[string]bool))
+	})
+
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	require.Len(t, lines, 5)
+	assert.Equal(t, "root", lines[0])
+	assert.Equal(t, "    ├── A", lines[1])
+	assert.Equal(t, "    │   └── C", lines[2])
+	assert.Equal(t, "    │       └── D", lines[3])
+	assert.Equal(t, "    └── B", lines[4])
+}
+
+func TestFindPaths_LinearChain(t *testing.T) {
+	nodes := map[string][]string{
+		"root": {"A"},
+		"A":    {"B"},
+		"B":    {"C"},
+	}
+
+	paths := findPaths(nodes, "root", "C")
+
+	assert.Equal(t, [][]string{{"root", "A", "B", "C"}}, paths)
+}
+
+func TestFindPaths_Diamond(t *testing.T) {
+	nodes := map[string][]string{
+		"root": {"A", "B"},
+		"A":    {"C"},
+		"B":    {"C"},
+	}
+
+	paths := findPaths(nodes, "root", "C")
+
+	assert.Equal(t, [][]string{{"root", "A", "C"}, {"root", "B", "C"}}, paths)
+}
+
+func TestFindPaths_NoMatch(t *testing.T) {
+	nodes := map[string][]string{
+		"root": {"A"},
+		"A":    {"B"},
+	}
+
+	paths := findPaths(nodes, "root", "X")
+
+	assert.Empty(t, paths)
+}
+
+func TestFindPaths_PartialMatch(t *testing.T) {
+	nodes := map[string][]string{
+		"root": {"github.com/davecgh/go-spew@v1.1.1"},
+	}
+
+	paths := findPaths(nodes, "root", "spew")
+
+	assert.Equal(t, [][]string{{"root", "github.com/davecgh/go-spew@v1.1.1"}}, paths)
+}
+
+func TestFindPaths_Cycle(t *testing.T) {
+	nodes := map[string][]string{
+		"root": {"A"},
+		"A":    {"B"},
+		"B":    {"A"},
+	}
+
+	paths := findPaths(nodes, "root", "B")
+
+	assert.Equal(t, [][]string{{"root", "A", "B"}}, paths)
+}
+
+func TestFindPaths_TargetIsRoot(t *testing.T) {
+	nodes := map[string][]string{
+		"root": {"A"},
+	}
+
+	paths := findPaths(nodes, "root", "root")
+
+	assert.Equal(t, [][]string{{"root"}}, paths)
+}
+
+func TestFindPaths_ContinuesBelowMatch(t *testing.T) {
+	nodes := map[string][]string{
+		"root":  {"A-lib"},
+		"A-lib": {"C-lib"},
+	}
+
+	paths := findPaths(nodes, "root", "lib")
+
+	assert.Equal(t, [][]string{{"root", "A-lib"}, {"root", "A-lib", "C-lib"}}, paths)
+}
+
+func TestFindPaths_MultipleBranchesBelowMatch(t *testing.T) {
+	nodes := map[string][]string{
+		"root":  {"A-lib"},
+		"A-lib": {"B-lib", "C-lib"},
+	}
+
+	paths := findPaths(nodes, "root", "lib")
+
+	assert.Equal(t, [][]string{
+		{"root", "A-lib"},
+		{"root", "A-lib", "B-lib"},
+		{"root", "A-lib", "C-lib"},
+	}, paths)
+}
+
+func TestFindPaths_RootAndDescendantMatch(t *testing.T) {
+	nodes := map[string][]string{
+		"root-lib": {"A-lib"},
+		"A-lib":    {"B"},
+	}
+
+	paths := findPaths(nodes, "root-lib", "lib")
+
+	assert.Equal(t, [][]string{{"root-lib"}, {"root-lib", "A-lib"}}, paths)
+}
+
+func TestFindPaths_DiamondWithCycle(t *testing.T) {
+	nodes := map[string][]string{
+		"root": {"A", "B"},
+		"A":    {"C"},
+		"B":    {"C"},
+		"C":    {"A"},
+	}
+
+	paths := findPaths(nodes, "root", "C")
+
+	assert.Equal(t, [][]string{{"root", "A", "C"}, {"root", "B", "C"}}, paths)
+}
+
+func TestFindPaths_DistinctNodesMatchingSameSubstring(t *testing.T) {
+	nodes := map[string][]string{
+		"root": {"alpha-x", "beta-x"},
+	}
+
+	paths := findPaths(nodes, "root", "x")
+
+	assert.Equal(t, [][]string{{"root", "alpha-x"}, {"root", "beta-x"}}, paths)
+}
+
+func TestPrintPath_LinearPath(t *testing.T) {
+	path := []string{"root", "A", "B", "C"}
+
+	output := captureOutput(func() {
+		printPath(path)
+	})
+
+	expected := "root\n    └── A\n        └── B\n            └── C\n"
+	assert.Equal(t, expected, output)
+}
+
+func TestPrintPath_SingleNode(t *testing.T) {
+	path := []string{"root"}
+
+	output := captureOutput(func() {
+		printPath(path)
+	})
+
+	assert.Equal(t, "root\n", output)
+}
+
+func TestPrintPath_TwoNodes(t *testing.T) {
+	path := []string{"root", "A"}
+
+	output := captureOutput(func() {
+		printPath(path)
+	})
+
+	expected := "root\n    └── A\n"
+	assert.Equal(t, expected, output)
 }
 
 func TestReadNodes(t *testing.T) {
