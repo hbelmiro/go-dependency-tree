@@ -7,12 +7,33 @@ import (
 	"maps"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 )
 
 func main() {
 	up := flag.Bool("up", false, "show path(s) from root to the matched module")
 	down := flag.Bool("down", false, "show the matched module's subtree")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, `Usage: %s [flags] [search-term]
+
+Visualize Go module dependency trees.
+
+Without a search term, prints the full dependency tree.
+With a search term, shows paths to matching modules (--up, the default)
+and/or their subtrees (--down). Both flags can be combined.
+
+Flags:
+  --up      show path(s) from root to the matched module
+  --down    show the matched module's subtree
+
+Examples:
+  %s                   Print the full dependency tree
+  %s spew              Show path(s) from root to modules matching "spew"
+  %s --down spew       Show subtree(s) rooted at modules matching "spew"
+  %s --up --down spew  Show both paths and subtrees
+`, os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0])
+	}
 	flag.Parse()
 
 	lines, err := goModGraph()
@@ -167,8 +188,7 @@ func getModuleName() string {
 	cmd := exec.Command("go", "list", "-m")
 	output, err := cmd.Output()
 	if err != nil {
-		fmt.Println("Error running go mod graph:", err)
-		return ""
+		log.Fatalf("error running go list -m [%v]", err)
 	}
 	return strings.TrimSpace(string(output))
 }
@@ -178,6 +198,5 @@ func goModGraph() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	lines := strings.Split(string(output), "\n")
-	return lines, nil
+	return slices.Collect(strings.SplitSeq(string(output), "\n")), nil
 }
